@@ -16,21 +16,17 @@ export default function LoginScreen({ navigation }) {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Login</Text>
-            <TextInput
-                style={styles.input}
+            <Input
                 placeholder="Name"
                 value={name}
                 onChangeText={setName}
             />
-            <TextInput
-                style={styles.input}
+            <Input
                 placeholder="Surname"
                 value={surname}
                 onChangeText={setSurname}
             />
-            <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                <Text style={styles.buttonText}>Login</Text>
-            </TouchableOpacity>
+            <Button title="Login" onPress={handleLogin} />
         </View>
     );
 }
@@ -47,24 +43,5 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 30,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 15,
-        marginBottom: 15,
-        borderRadius: 5,
-        backgroundColor: '#fff',
-    },
-    button: {
-        backgroundColor: '#007AFF',
-        padding: 15,
-        borderRadius: 5,
-        alignItems: 'center',
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
     },
 });

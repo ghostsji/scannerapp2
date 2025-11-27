@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Button from '../components/Button';
+import Input from '../components/Input';
 
 export default function GalleryScreen({ route, navigation }) {
     const { user } = route.params;
@@ -76,27 +78,22 @@ export default function GalleryScreen({ route, navigation }) {
             <Text style={styles.title}>Gallery</Text>
 
             <View style={styles.filterContainer}>
-                <TextInput
-                    style={styles.filterInput}
+                <Input
                     placeholder="Filter by Pick Note"
                     value={filterPickNote}
                     onChangeText={setFilterPickNote}
                 />
-                <TextInput
-                    style={styles.filterInput}
+                <Input
                     placeholder="Filter by User"
                     value={filterUser}
                     onChangeText={setFilterUser}
                 />
-                <TextInput
-                    style={styles.filterInput}
+                <Input
                     placeholder="Filter by Client"
                     value={filterClient}
                     onChangeText={setFilterClient}
                 />
-                <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-                    <Text style={styles.clearButtonText}>Clear Filters</Text>
-                </TouchableOpacity>
+                <Button title="Clear Filters" onPress={clearFilters} variant="danger" />
             </View>
 
             <FlatList
@@ -137,16 +134,7 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         backgroundColor: '#fff',
     },
-    clearButton: {
-        backgroundColor: '#FF3B30',
-        padding: 10,
-        borderRadius: 5,
-        alignItems: 'center',
-    },
-    clearButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
+
     list: {
         flex: 1,
     },
@@ -178,16 +166,5 @@ const styles = StyleSheet.create({
         color: '#999',
         marginTop: 50,
     },
-    backButton: {
-        backgroundColor: '#007AFF',
-        padding: 15,
-        borderRadius: 5,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    backButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
+
 });

@@ -75,12 +75,8 @@ export default function CameraScreen({ route, navigation }) {
             <Text style={styles.subtitle}>Select an image from your gallery</Text>
 
             <View style={styles.controls}>
-                <TouchableOpacity style={styles.captureButton} onPress={pickImage}>
-                    <Text style={styles.captureButtonText}>Select Image</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.captureButton, styles.secondaryButton]} onPress={() => navigation.goBack()}>
-                    <Text style={styles.captureButtonText}>Back</Text>
-                </TouchableOpacity>
+                <Button title="Select Image" onPress={pickImage} />
+                <Button title="Back" onPress={() => navigation.goBack()} variant="secondary" />
             </View>
 
             <Modal visible={modalVisible} animationType="slide">

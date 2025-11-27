@@ -26,30 +26,23 @@ export default function MainScreen({ route, navigation }) {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Welcome, {user.name} {user.surname}</Text>
-            <TextInput
-                style={styles.input}
+            <Input
                 placeholder="Pick Note Number"
                 value={pickNote}
                 onChangeText={setPickNote}
             />
-            <TextInput
-                style={styles.input}
+            <Input
                 placeholder="Client Name"
                 value={clientName}
                 onChangeText={setClientName}
             />
-            <TextInput
-                style={styles.input}
+            <Input
                 placeholder="Client Code"
                 value={clientCode}
                 onChangeText={setClientCode}
             />
-            <TouchableOpacity style={styles.button} onPress={handleStartScanning}>
-                <Text style={styles.buttonText}>Start Scanning</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={handleViewGallery}>
-                <Text style={styles.buttonText}>View Gallery</Text>
-            </TouchableOpacity>
+            <Button title="Start Scanning" onPress={handleStartScanning} />
+            <Button title="View Gallery" onPress={handleViewGallery} variant="secondary" />
         </View>
     );
 }
