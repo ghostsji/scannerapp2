@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import Input from '../components/Input';
+import Button from '../components/Button';
 
 export default function LoginScreen({ navigation }) {
     const [name, setName] = useState('');

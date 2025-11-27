@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert, Image, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Button from '../components/Button';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function CameraScreen({ route, navigation }) {
     const { user, pickNote, client } = route.params;
@@ -10,8 +11,20 @@ export default function CameraScreen({ route, navigation }) {
     const [description, setDescription] = useState('');
     const [quantity, setQuantity] = useState('');
 
+    const fileInputRef = useRef(null);
+
     const pickImage = async () => {
+        if (Platform.OS === 'web') {
+            fileInputRef.current?.click();
+            return;
+        }
         try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission denied', 'Sorry, we need camera roll permissions to make this work!');
+                return;
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
@@ -25,6 +38,15 @@ export default function CameraScreen({ route, navigation }) {
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to pick image');
+        }
+    };
+
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const uri = URL.createObjectURL(file);
+            setSelectedImage({ uri });
+            setModalVisible(true);
         }
     };
 
