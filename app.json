@@ -24,7 +24,7 @@
       "package": "com.tracklab.scan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#090b14"
+        "backgroundColor": "#ff8a00"
       },
       "edgeToEdgeEnabled": true,
       "permissions": ["android.permission.CAMERA"]
