@@ -1,75 +1,37 @@
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-
-const Button = ({ title, onPress, variant = 'primary', style }) => {
-    const buttonStyle = [styles.button, style];
-    const textStyle = [styles.buttonText];
-
-    if (variant === 'secondary') {
-        buttonStyle.push(styles.secondaryButton);
-    } else if (variant === 'danger') {
-        buttonStyle.push(styles.dangerButton);
-    }
-
-    return (
-        <TouchableOpacity style={buttonStyle} onPress={onPress}>
-            <Text style={textStyle}>{title}</Text>
-        </TouchableOpacity>
-    );
-};
-
-const styles = StyleSheet.create({
-    button: {
-        backgroundColor: '#007AFF',
-        padding: 15,
-        borderRadius: 5,
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    secondaryButton: {
-        backgroundColor: '#34C759',
-    },
-    dangerButton: {
-        backgroundColor: '#FF3B30',
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-});
-
-export default Button;
-=======
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { theme } from '../constants/theme';
 
-const Button = ({ title, onPress, variant = 'primary', style, disabled = false }) => {
+const Button = ({ title, onPress, variant = 'primary', style, disabled = false, loading = false, color }) => {
     const buttonStyle = [styles.button, style];
     const textStyle = [styles.buttonText];
 
     if (variant === 'secondary') {
         buttonStyle.push(styles.secondaryButton);
+        textStyle.push(styles.secondaryText);
     } else if (variant === 'danger') {
         buttonStyle.push(styles.dangerButton);
+        textStyle.push(styles.lightText);
     } else if (variant === 'outline') {
         buttonStyle.push(styles.outlineButton);
         textStyle.push(styles.outlineButtonText);
     }
-
-    if (disabled) {
-        buttonStyle.push(styles.disabledButton);
-        textStyle.push(styles.disabledButtonText);
+    if (color) {
+        buttonStyle.push({ backgroundColor: color });
+        textStyle.push(color === theme.colors.in ? styles.lightText : null);
     }
+    if (disabled || loading) buttonStyle.push(styles.disabledButton);
 
     return (
         <TouchableOpacity
             style={buttonStyle}
             onPress={onPress}
-            disabled={disabled}
+            disabled={disabled || loading}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={title}
         >
-            <Text style={textStyle}>{title}</Text>
+            {loading ? <ActivityIndicator color={theme.colors.text} /> : <Text style={textStyle}>{title}</Text>}
         </TouchableOpacity>
     );
 };
@@ -77,43 +39,22 @@ const Button = ({ title, onPress, variant = 'primary', style, disabled = false }
 const styles = StyleSheet.create({
     button: {
         backgroundColor: theme.colors.primary,
-        padding: theme.spacing.medium,
+        paddingVertical: 15,
+        paddingHorizontal: theme.spacing.medium,
         borderRadius: theme.borderRadius.medium,
         alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: theme.spacing.small,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+        minHeight: 52,
     },
-    secondaryButton: {
-        backgroundColor: theme.colors.secondary,
-    },
-    dangerButton: {
-        backgroundColor: theme.colors.danger,
-    },
-    outlineButton: {
-        backgroundColor: 'transparent',
-        borderWidth: 1,
-        borderColor: theme.colors.primary,
-    },
-    outlineButtonText: {
-        color: theme.colors.primary,
-    },
-    disabledButton: {
-        backgroundColor: theme.colors.border,
-        elevation: 0,
-        shadowOpacity: 0,
-    },
-    disabledButtonText: {
-        color: theme.colors.textSecondary,
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: theme.fontSize.medium,
-        fontWeight: 'bold',
-    },
+    secondaryButton: { backgroundColor: theme.colors.cardHigh },
+    secondaryText: { color: theme.colors.text },
+    dangerButton: { backgroundColor: theme.colors.danger },
+    lightText: { color: '#fff' },
+    outlineButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.border },
+    outlineButtonText: { color: theme.colors.text },
+    disabledButton: { opacity: 0.45 },
+    buttonText: { color: theme.colors.onPrimary, fontSize: theme.fontSize.medium, fontWeight: 'bold' },
 });
 
 export default Button;

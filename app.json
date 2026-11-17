@@ -1,29 +1,56 @@
 {
   "expo": {
-    "name": "scannerapp",
+    "name": "Tracklab Scan",
     "slug": "scannerapp",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#090b14"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tracklab.scan",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Tracklab Scan uses the camera to scan reel and item labels and to photograph picked stock.",
+        "NSPhotoLibraryUsageDescription": "Tracklab Scan lets you choose a photo of picked stock."
+      }
     },
     "android": {
+      "package": "com.tracklab.scan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#090b14"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tracklab Scan uses the camera to scan reel and item labels and to photograph picked stock.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tracklab Scan lets you choose a photo of picked stock.",
+          "cameraPermission": "Tracklab Scan uses the camera to photograph picked stock."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://tracklab-im.fly.dev"
     }
   }
 }
