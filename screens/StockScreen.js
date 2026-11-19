@@ -7,6 +7,7 @@ import CodeScanner from '../components/CodeScanner';
 import PlacePicker from '../components/PlacePicker';
 import QueueBar from '../components/QueueBar';
 import { api, newClientRef } from '../lib/api';
+import { SCANS_PAGE, mergeScans, nearEnd } from '../lib/scans';
 import { enqueue, flushQueue } from '../lib/queue';
 import { useAuth } from '../lib/auth';
 import { theme } from '../constants/theme';
@@ -49,6 +50,13 @@ export default function StockScreen({ navigation }) {
   const [form, setForm] = useState(EMPTY);
   const [locations, setLocations] = useState([]);
   const [mine, setMine] = useState([]);
+  // My scans: the newest page is re-read every 15 s; older pages load as the list is scrolled.
+  const [mineTotal, setMineTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [showTop, setShowTop] = useState(false);
+  const scrollRef = useRef(null);
+  // BOMs the website sent to be scanned (Book Out Entire BOM): announced at the top.
+  const [bomsWaiting, setBomsWaiting] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const clientRef = useRef(newClientRef());
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
@@ -61,8 +69,31 @@ export default function StockScreen({ navigation }) {
   const setD = (k) => (v) => setDraft((d) => ({ ...d, [k]: v }));
 
   const loadMine = useCallback(async () => {
-    try { const r = await api('/api/stock-moves?mine=1&pageSize=20'); setMine(r.items || []); } catch { /* no signal: keep what is shown */ }
+    try {
+      const r = await api(`/api/stock-moves?mine=1&pageSize=${SCANS_PAGE}`);
+      setMine((prev) => mergeScans(prev, r.items || [])); setMineTotal(r.total || 0);
+    } catch { /* no signal: keep what is shown */ }
+    try { const b = await api('/api/bom-picks?status=OPEN'); setBomsWaiting(b.items || []); } catch { /* try again on the next tick */ }
   }, []);
+  // The next page of older scans. New scans arriving meanwhile only shift rows already
+  // loaded onto the next page, and those are merged by id, so nothing is skipped or doubled.
+  const loadingMoreRef = useRef(false);
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true; setLoadingMore(true);
+    try {
+      const page = Math.floor(mine.length / SCANS_PAGE) + 1;
+      const r = await api(`/api/stock-moves?mine=1&pageSize=${SCANS_PAGE}&page=${page}`);
+      setMine((prev) => mergeScans(prev, r.items || [])); setMineTotal(r.total || 0);
+    } catch { /* no signal: the button stays to try again */ } finally { loadingMoreRef.current = false; setLoadingMore(false); }
+  }, [mine.length]);
+  const hasMore = mine.length < mineTotal;
+  const onScroll = (e) => {
+    const n = e.nativeEvent;
+    if (hasMore && nearEnd(n)) loadMore();
+    const far = n.contentOffset.y > 900;
+    if (far !== showTop) setShowTop(far);
+  };
   const loadLocations = useCallback(async () => {
     try { const r = await api('/api/stock-locations'); setLocations((r.locations || []).filter((l) => l.active)); } catch { /* try again on refresh */ }
   }, []);
@@ -213,17 +244,29 @@ export default function StockScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={200}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.colors.primary} />}>
           <View style={styles.header}>
             <View style={styles.flex}>
               <Text style={styles.h1}>Tracklab Scan</Text>
               <Text style={styles.small}>{user?.name}</Text>
             </View>
+            <TouchableOpacity onPress={() => navigation.navigate('BomPick')} style={styles.headBtn}><Text style={styles.headBtnText}>BOM</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Pick')} style={styles.headBtn}><Text style={styles.headBtnText}>Pick photo</Text></TouchableOpacity>
             <TouchableOpacity onPress={askSignOut} style={styles.headBtn}><Text style={styles.headBtnText}>Sign out</Text></TouchableOpacity>
           </View>
 
           <QueueBar />
+
+          {bomsWaiting.length && !item && !unknown && !choices ? (
+            <TouchableOpacity style={styles.bomBanner} onPress={() => navigation.navigate('BomPick', bomsWaiting.length === 1 ? { id: bomsWaiting[0].id } : undefined)} accessibilityRole="button">
+              <View style={styles.flex}>
+                <Text style={styles.bold}>{bomsWaiting.length === 1 ? 'A BOM is waiting to be scanned' : `${bomsWaiting.length} BOMs are waiting to be scanned`}</Text>
+                <Text style={styles.small} numberOfLines={1}>{bomsWaiting.map((b) => `${b.projectName || `Project ${b.projectId}`} × ${b.buildQty} (${b.done}/${b.lines})`).join(' · ')}</Text>
+              </View>
+              <Text style={styles.bomBannerGo}>SCAN BOM ITEMS ›</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.switch} accessibilityLabel="Book in or out">
             {dirBtn('IN', 'Book in')}
@@ -349,7 +392,7 @@ export default function StockScreen({ navigation }) {
             </View>
           ) : null}
 
-          <Text style={styles.h2}>My scans{pending ? ` · ${pending} waiting` : ''}</Text>
+          <Text style={styles.h2}>My scans{pending ? ` · ${pending} waiting` : ''}{mineTotal ? <Text style={styles.small}>{`   ${mine.length < mineTotal ? `${mine.length} of ${mineTotal}` : `${mineTotal} in all`}`}</Text> : null}</Text>
           {mine.length === 0 ? <Text style={styles.small}>Nothing scanned yet.</Text> : null}
           {mine.map((m) => {
             const s = STATUS[m.status] || STATUS.PENDING;
@@ -375,7 +418,15 @@ export default function StockScreen({ navigation }) {
               </View>
             );
           })}
+          {hasMore ? (
+            <Button title={loadingMore ? 'Loading older scans…' : `Show older scans (${mineTotal - mine.length} more)`} variant="outline" onPress={loadMore} loading={loadingMore} />
+          ) : mine.length > SCANS_PAGE ? <Text style={[styles.small, styles.center]}>That's all your scans.</Text> : null}
         </ScrollView>
+        {showTop ? (
+          <TouchableOpacity style={styles.top} onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })} accessibilityRole="button" accessibilityLabel="Back to top">
+            <Text style={styles.topText}>↑ Top</Text>
+          </TouchableOpacity>
+        ) : null}
       </KeyboardAvoidingView>
 
       <CodeScanner
@@ -443,4 +494,8 @@ const styles = StyleSheet.create({
   bannerLink: { color: theme.colors.primary, borderColor: 'rgba(247,145,43,0.3)', backgroundColor: 'rgba(247,145,43,0.08)' },
   cancel: { borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   cancelText: { color: theme.colors.danger, fontWeight: 'bold', fontSize: 12 },
+  bomBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 2, borderColor: theme.colors.primary, backgroundColor: 'rgba(247,145,43,0.1)', borderRadius: theme.borderRadius.large, padding: 14, marginBottom: theme.spacing.medium },
+  bomBannerGo: { color: theme.colors.primary, fontWeight: '900', fontSize: 12 },
+  top: { position: 'absolute', right: 16, bottom: 24, backgroundColor: theme.colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  topText: { color: theme.colors.onPrimary, fontWeight: '900' },
 });

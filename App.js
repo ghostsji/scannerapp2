@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,10 +8,11 @@ import { AuthProvider, useAuth } from './lib/auth';
 import SignInScreen from './screens/SignInScreen';
 import StockScreen from './screens/StockScreen';
 import PickScreen from './screens/PickScreen';
+import BomPickScreen from './screens/BomPickScreen';
 import { theme } from './constants/theme';
 
 // Tracklab Scan. Signed out: the sign-in screen. Signed in: Book in / out
-// (the main screen) and Pick photo. Every scan shows on the Tracklab website
+// (the main screen), Pick photo, and Scan BOM items. Every scan shows on the Tracklab website
 // under Sales > Scanner, where stock moves wait for approval.
 
 const Stack = createStackNavigator();
@@ -26,11 +27,14 @@ function Screens() {
     return <View style={{ flex: 1, justifyContent: 'center', backgroundColor: theme.colors.background }}><ActivityIndicator color={theme.colors.primary} /></View>;
   }
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    // On the web build a screen's card otherwise grows with its content (the browser's
+    // own scrolling is turned off), so the lists could not be scrolled: hold it to the window.
+    <Stack.Navigator screenOptions={{ headerShown: false, ...(Platform.OS === 'web' ? { cardStyle: { flex: 1, minHeight: 0 } } : {}) }}>
       {user ? (
         <>
           <Stack.Screen name="Stock" component={StockScreen} />
           <Stack.Screen name="Pick" component={PickScreen} />
+          <Stack.Screen name="BomPick" component={BomPickScreen} />
         </>
       ) : (
         <Stack.Screen name="SignIn" component={SignInScreen} />

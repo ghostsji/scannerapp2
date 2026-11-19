@@ -9,6 +9,13 @@ The phone app for Tracklab IM. Sign in with your Tracklab email and password, th
   Booking in a label that isn't in Tracklab offers **Add as a new item** (stock code, name, maker
   part number from the label) or **Link to an existing item** (the label is remembered on it, so the
   next scan finds it). Both happen only when the scan is approved on the website.
+  My scans loads older scans as you scroll down (with a Top button to come back up).
+- **Scan BOM items** (the **BOM** button, or the banner that appears when a BOM is waiting): the
+  phone's half of **Book Out Entire BOM** on the website. Open a waiting BOM, see where each item
+  is kept, and scan them. A wrong part is refused; an item kept on reels is taken a whole reel at a
+  time; anything else must match what the BOM still needs. Lines go green on the phone and on the
+  website as they're picked, and a scan can be undone. The website does the final check and books
+  it out. This needs signal (the website watches it live), so it isn't queued offline.
 - **Pick photo**: photograph picked stock against a sales order or delivery note number. It shows
   on the website under Sales > Scanner > Pick scans.
 
@@ -46,8 +53,9 @@ the home screen.
 
 | | |
 |---|---|
-| `App.js` | Sign-in gate and the two screens |
-| `screens/StockScreen.js` | Book in / out and My scans |
+| `App.js` | Sign-in gate and the screens |
+| `screens/StockScreen.js` | Book in / out, My scans (pages load as you scroll), the BOM banner |
+| `screens/BomPickScreen.js` | Scan BOM items |
 | `screens/PickScreen.js` | Pick photos |
 | `screens/SignInScreen.js` | Sign in |
 | `components/CodeScanner.js` | Camera barcode scanner |
@@ -56,3 +64,5 @@ the home screen.
 | `lib/api.js` | Calls to Tracklab; the token lives in the phone's secure store |
 | `lib/auth.js` | Who is signed in |
 | `lib/queue.js` | The offline queue |
+| `lib/bomPick.js` | BOM picking rules: which line a scan is for, which place, what to tell the picker |
+| `lib/scans.js` | My scans paging |
