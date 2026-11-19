@@ -18,6 +18,7 @@ import { theme } from '../constants/theme';
 // sent later (lib/queue.js). Same steps as Tracklab's own /scan page.
 
 const EMPTY = { quantity: '', location: null, lot: '', dateCode: '', reference: '', note: '' };
+const EMPTY_DRAFT = { partNumber: '', name: '', makerPartNumber: '', description: '' };
 
 const when = (v) => {
   const d = new Date(v || '');
@@ -51,6 +52,13 @@ export default function StockScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const clientRef = useRef(newClientRef());
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+  // A book-in label that isn't in Tracklab: add it as a new item, or link it to an existing one.
+  // Both happen only when the scan is approved on the website.
+  const [unknown, setUnknown] = useState(null); // { code, barcodes, label }
+  const [mode, setMode] = useState(null); // null | 'new' | 'link'
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [newItem, setNewItem] = useState(null);
+  const setD = (k) => (v) => setDraft((d) => ({ ...d, [k]: v }));
 
   const loadMine = useCallback(async () => {
     try { const r = await api('/api/stock-moves?mine=1&pageSize=20'); setMine(r.items || []); } catch { /* no signal: keep what is shown */ }
@@ -75,6 +83,7 @@ export default function StockScreen({ navigation }) {
 
   const reset = () => {
     setItem(null); setChoices(null); setTyped(''); setError(null); setForm(EMPTY);
+    setUnknown(null); setMode(null); setDraft(EMPTY_DRAFT); setNewItem(null);
     clientRef.current = newClientRef();
   };
 
@@ -82,13 +91,39 @@ export default function StockScreen({ navigation }) {
     setItem(it); setChoices(null);
     // Many items have a location named after their own stock code: offer it for a book-in.
     const own = locations.find((l) => l.code.toUpperCase() === it.partNumber.toUpperCase());
+    // When linking an unknown label, what it said (quantity, lot) comes from that first scan.
+    const label = found?.label || unknown?.label || null;
     setForm((f) => ({
       ...f,
       location: f.location || (direction === 'IN' && own ? own : null),
-      quantity: found?.label?.quantity ? String(found.label.quantity) : f.quantity,
-      lot: found?.label?.lot || f.lot,
-      dateCode: found?.label?.dateCode || f.dateCode,
+      quantity: label?.quantity ? String(label.quantity) : f.quantity,
+      lot: label?.lot || f.lot,
+      dateCode: label?.dateCode || f.dateCode,
     }));
+  };
+
+  const startNew = () => {
+    setMode('new'); setError(null);
+    // A supplier label's first part number is the maker's: offer it for the new item.
+    setDraft((d) => ({ ...d, makerPartNumber: d.makerPartNumber || (unknown?.label?.partNumbers?.[0] || '') }));
+  };
+
+  // The new item's stock code is checked (not used yet), then it is booked in like any other.
+  const continueNew = async () => {
+    const code = draft.partNumber.trim().toUpperCase().replace(/\s+/g, '-');
+    if (!/^[A-Z0-9][A-Z0-9._/-]{1,59}$/.test(code)) { setError('Give it a stock code: 2 to 60 letters, digits, dashes, dots or slashes.'); return; }
+    if (!draft.name.trim()) { setError('Give the new item a name.'); return; }
+    setBusy(true); setError(null);
+    try {
+      const found = await api(`/api/stock-moves/find?code=${encodeURIComponent(code)}`);
+      const same = found.matchedBy === 'stock code' ? found.items[0] : null;
+      if (same) { setError(`${same.partNumber} is already an item (${same.name}). Choose another stock code, or link the label to it instead.`); return; }
+      const ni = { partNumber: code, name: draft.name.trim(), makerPartNumber: draft.makerPartNumber.trim() || null, description: draft.description.trim() || null };
+      setNewItem(ni);
+      choose({ partNumber: code, name: ni.name, description: ni.description, makerPartNumber: ni.makerPartNumber, stock: 0, places: [], noLocation: 0 });
+    } catch (err) {
+      setError(err?.network ? 'No connection, so the stock code can\'t be checked. Try again when there is signal.' : err?.message);
+    } finally { setBusy(false); }
   };
 
   const lookUp = async (code, forPlace = false) => {
@@ -101,10 +136,18 @@ export default function StockScreen({ navigation }) {
         else setError('That is not a stock location label.');
         return;
       }
+      if (unknown) {
+        // Looking for the existing item to link the unknown label to.
+        if (found.items.length === 1) choose(found.items[0]);
+        else if (found.items.length > 1) setChoices(found.items);
+        else setError('No item matches that. Try another code or name, or add it as a new item.');
+        return;
+      }
       if (found.items.length === 1) choose(found.items[0], found);
       else if (found.items.length > 1) setChoices(found.items);
       else if (found.location) setError(`${found.location.code} is a location. Scan the item first, then its place.`);
-      else setError('Not found in Tracklab. Check the code, or add the item on the website first.');
+      else if (direction === 'IN' && found.barcodes?.length) { setUnknown({ code: String(code), barcodes: found.barcodes, label: found.label }); setTyped(''); }
+      else setError(direction === 'OUT' ? 'Not found in Tracklab, so there is nothing to book out. Check the code.' : 'Not found in Tracklab. Check the code.');
     } catch (err) {
       setError(err?.network ? 'No connection, so the code can\'t be looked up. Try again when there is signal.' : err?.message);
     } finally { setBusy(false); }
@@ -120,8 +163,11 @@ export default function StockScreen({ navigation }) {
       lot: direction === 'IN' ? form.lot.trim() : '', dateCode: direction === 'IN' ? form.dateCode.trim() : '',
       reference: form.reference.trim(), note: form.note.trim(),
       capturedAt: new Date().toISOString(),
+      // An unknown label: the item to create, or the label to remember on the chosen item.
+      ...(newItem ? { newItem } : {}),
+      ...(unknown ? { code: unknown.code, saveBarcode: !newItem } : {}),
     };
-    const what = `${direction === 'IN' ? 'book in' : 'book out'} ${quantity} × ${item.partNumber}`;
+    const what = `${direction === 'IN' ? 'book in' : 'book out'} ${quantity} × ${item.partNumber}${newItem ? ' (new item)' : unknown ? ' (barcode linked)' : ''}`;
     setBusy(true); setError(null);
     try {
       await api('/api/stock-moves', { method: 'POST', body: { ...payload, clientRef: clientRef.current } });
@@ -157,7 +203,7 @@ export default function StockScreen({ navigation }) {
   const dirBtn = (d, text) => {
     const on = direction === d;
     return (
-      <TouchableOpacity style={[styles.dir, on && { backgroundColor: d === 'IN' ? theme.colors.in : theme.colors.out }]} onPress={() => { setDirection(d); setError(null); setForm((f) => ({ ...f, location: null })); }} accessibilityRole="button" accessibilityState={{ selected: on }}>
+      <TouchableOpacity style={[styles.dir, on && { backgroundColor: d === 'IN' ? theme.colors.in : theme.colors.out }]} onPress={() => { if (d !== direction && (unknown || newItem)) reset(); setDirection(d); setError(null); setForm((f) => ({ ...f, location: null })); }} accessibilityRole="button" accessibilityState={{ selected: on }}>
         <Text style={[styles.dirText, on && { color: d === 'IN' ? '#fff' : '#000' }]}>{text}</Text>
       </TouchableOpacity>
     );
@@ -187,7 +233,64 @@ export default function StockScreen({ navigation }) {
           {notice ? <Text style={styles.notice} accessibilityRole="text">{notice}</Text> : null}
           {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
 
-          {!item && !choices ? (
+          {unknown && !item && !choices ? (
+            <View style={styles.card} accessibilityLabel="Not in Tracklab">
+              <View style={styles.headRow}>
+                <Text style={[styles.bold, styles.flex]}>Not in Tracklab yet</Text>
+                <TouchableOpacity onPress={reset} accessibilityLabel="Start again" style={styles.closeBtn}><Text style={styles.closeText}>✕</Text></TouchableOpacity>
+              </View>
+              <Text style={styles.label}>SCANNED</Text>
+              <View style={[styles.wrap, styles.gapBottom]}>
+                {unknown.barcodes.map((b) => <Text key={b} style={styles.tag}>{b}</Text>)}
+                {unknown.label?.quantity ? <Text style={[styles.tag, styles.tagDim]}>Qty {unknown.label.quantity}</Text> : null}
+              </View>
+
+              {!mode ? (
+                <>
+                  <TouchableOpacity style={styles.option} onPress={startNew} accessibilityRole="button">
+                    <Text style={[styles.optionIcon, { backgroundColor: theme.colors.in, color: '#fff' }]}>+</Text>
+                    <View style={styles.flex}>
+                      <Text style={styles.bold}>Add as a new item</Text>
+                      <Text style={styles.small}>Give it a stock code and name, then book it in</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.option} onPress={() => { setMode('link'); setError(null); }} accessibilityRole="button">
+                    <Text style={[styles.optionIcon, { backgroundColor: theme.colors.cardHigh, color: theme.colors.primary, fontSize: 20 }]}>🔗</Text>
+                    <View style={styles.flex}>
+                      <Text style={styles.bold}>Link to an existing item</Text>
+                      <Text style={styles.small}>It's in Tracklab under another code: this label will find it next time</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <Text style={[styles.small, styles.center]}>Nothing is added until someone approves the scan on the website.</Text>
+                </>
+              ) : null}
+
+              {mode === 'new' ? (
+                <>
+                  <Input label="New stock code" value={draft.partNumber} onChangeText={setD('partNumber')} placeholder="e.g. CAP-099" autoCapitalize="characters" autoCorrect={false} autoFocus />
+                  <Input label="Name" value={draft.name} onChangeText={setD('name')} placeholder="e.g. 10uF 0603 X5R 16V" />
+                  <Input label="Maker part number (optional)" value={draft.makerPartNumber} onChangeText={setD('makerPartNumber')} autoCapitalize="characters" autoCorrect={false} />
+                  <Input label="Description (optional)" value={draft.description} onChangeText={setD('description')} />
+                  <Button title="Continue to quantity" onPress={continueNew} loading={busy} color={theme.colors.in} />
+                  <Button title="Back" variant="outline" onPress={() => { setMode(null); setError(null); }} />
+                </>
+              ) : null}
+
+              {mode === 'link' ? (
+                <>
+                  <Text style={[styles.text, styles.gapSmall]}>Find the item this label belongs to:</Text>
+                  <View style={[styles.row, styles.gapSmall]}>
+                    <TextInput style={[styles.field, styles.flex]} value={typed} onChangeText={setTyped} placeholder="Stock code, name or part number" placeholderTextColor={theme.colors.textSecondary} autoCapitalize="characters" autoCorrect={false} returnKeyType="search" onSubmitEditing={() => lookUp(typed)} autoFocus accessibilityLabel="Find the existing item" />
+                    <TouchableOpacity style={styles.findBtn} onPress={() => lookUp(typed)} disabled={busy || !typed.trim()}><Text style={styles.findText}>{busy ? '…' : 'Find'}</Text></TouchableOpacity>
+                  </View>
+                  <Button title="Scan its Tracklab label" variant="secondary" onPress={() => setCamera('item')} />
+                  <Button title="Back" variant="outline" onPress={() => { setMode(null); setError(null); }} />
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
+          {!item && !choices && !unknown ? (
             <View style={styles.card}>
               <Button title="Scan a label" onPress={() => { setError(null); setNotice(null); setCamera('item'); }} disabled={busy} />
               <View style={styles.row}>
@@ -207,7 +310,7 @@ export default function StockScreen({ navigation }) {
                   <Text style={styles.small}>In stock {c.stock}{c.makerPartNumber ? ` · ${c.makerPartNumber}` : ''}</Text>
                 </TouchableOpacity>
               ))}
-              <Button title="Back" variant="outline" onPress={reset} />
+              <Button title="Back" variant="outline" onPress={() => (unknown ? setChoices(null) : reset())} />
             </View>
           ) : null}
 
@@ -216,6 +319,8 @@ export default function StockScreen({ navigation }) {
               <Text style={[styles.code, styles.big]}>{item.partNumber}</Text>
               <Text style={styles.bold}>{item.name}</Text>
               {item.makerPartNumber ? <Text style={styles.small}>{item.makerPartNumber}</Text> : null}
+              {newItem ? <Text style={[styles.banner, styles.bannerNew]}>New item: it is added to Tracklab when this scan is approved.</Text> : null}
+              {unknown && !newItem ? <Text style={[styles.banner, styles.bannerLink]}>When approved, the label {unknown.barcodes.join(', ')} is saved on this item, so the next scan finds it.</Text> : null}
               <Text style={[styles.text, styles.gap]}>In stock: <Text style={styles.bold}>{item.stock}</Text></Text>
               <Text style={[styles.small, styles.gapBottom]}>{whereLine(item)}</Text>
 
@@ -256,7 +361,11 @@ export default function StockScreen({ navigation }) {
                     <Text style={styles.code}> {m.partNumber}</Text>
                   </Text>
                   <Text style={styles.small} numberOfLines={1}>{[m.location?.code, m.reference, when(m.capturedAt || m.createdAt)].filter(Boolean).join(' · ')}</Text>
-                  <Text style={[styles.chip, { color: s.color, borderColor: s.color }]}>{s.text}</Text>
+                  <View style={styles.wrap}>
+                    <Text style={[styles.chip, { color: s.color, borderColor: s.color }]}>{s.text}</Text>
+                    {m.newItem ? <Text style={[styles.chip, { color: theme.colors.success, borderColor: theme.colors.success }]}>New item</Text> : null}
+                    {!m.newItem && m.linkCodes?.length ? <Text style={[styles.chip, { color: theme.colors.primary, borderColor: theme.colors.primary }]}>Barcode</Text> : null}
+                  </View>
                   {m.status === 'REJECTED' && m.rejectReason ? <Text style={styles.reason}>{m.rejectReason}</Text> : null}
                   {m.status === 'APPROVED' && m.stockAfter != null ? <Text style={styles.small}>Stock after: {m.stockAfter}{m.decidedBy ? ` · ${m.decidedBy}` : ''}</Text> : null}
                 </View>
@@ -320,6 +429,18 @@ const styles = StyleSheet.create({
   scan: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: theme.colors.card, borderColor: theme.colors.border, borderWidth: 1, borderRadius: theme.borderRadius.medium, padding: 12, marginBottom: 8 },
   chip: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, fontSize: 11, fontWeight: 'bold', marginTop: 6, overflow: 'hidden' },
   reason: { color: theme.colors.danger, fontSize: 12, marginTop: 2 },
+  headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.medium },
+  closeBtn: { padding: 6 },
+  closeText: { color: theme.colors.textSecondary, fontSize: 16, fontWeight: 'bold' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag: { color: theme.colors.text, backgroundColor: theme.colors.cardHigh, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold', overflow: 'hidden' },
+  tagDim: { color: theme.colors.textSecondary, fontFamily: undefined, fontWeight: 'normal' },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.large, padding: 14, marginBottom: 10, backgroundColor: theme.colors.background },
+  optionIcon: { width: 44, height: 44, borderRadius: 12, textAlign: 'center', textAlignVertical: 'center', lineHeight: 44, fontSize: 22, fontWeight: 'bold', overflow: 'hidden' },
+  gapSmall: { marginBottom: theme.spacing.small },
+  banner: { borderWidth: 1, borderRadius: theme.borderRadius.medium, padding: 10, fontSize: 12, fontWeight: '600', marginTop: 10, overflow: 'hidden' },
+  bannerNew: { color: theme.colors.success, borderColor: 'rgba(74,222,128,0.3)', backgroundColor: 'rgba(74,222,128,0.08)' },
+  bannerLink: { color: theme.colors.primary, borderColor: 'rgba(247,145,43,0.3)', backgroundColor: 'rgba(247,145,43,0.08)' },
   cancel: { borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   cancelText: { color: theme.colors.danger, fontWeight: 'bold', fontSize: 12 },
 });

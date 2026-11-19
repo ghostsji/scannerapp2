@@ -6,6 +6,9 @@ The phone app for Tracklab IM. Sign in with your Tracklab email and password, th
   type a stock code, check the item, enter the quantity and place, and send. The scan waits on
   the website under **Sales > Scanner** until someone approves it; only then does stock change.
   **My scans** shows each one turning Approved or Rejected, and Cancel on those still waiting.
+  Booking in a label that isn't in Tracklab offers **Add as a new item** (stock code, name, maker
+  part number from the label) or **Link to an existing item** (the label is remembered on it, so the
+  next scan finds it). Both happen only when the scan is approved on the website.
 - **Pick photo**: photograph picked stock against a sales order or delivery note number. It shows
   on the website under Sales > Scanner > Pick scans.
 
