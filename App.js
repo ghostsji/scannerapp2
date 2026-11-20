@@ -9,10 +9,11 @@ import SignInScreen from './screens/SignInScreen';
 import StockScreen from './screens/StockScreen';
 import PickScreen from './screens/PickScreen';
 import BomPickScreen from './screens/BomPickScreen';
+import BillScanScreen from './screens/BillScanScreen';
 import { theme } from './constants/theme';
 
 // Tracklab Scan. Signed out: the sign-in screen. Signed in: Book in / out
-// (the main screen), Pick photo, and Scan BOM items. Every scan shows on the Tracklab website
+// (the main screen), Pick photo, Scan BOM items and Scan a bill. Every scan shows on the Tracklab website
 // under Sales > Scanner, where stock moves wait for approval.
 
 const Stack = createStackNavigator();
@@ -35,6 +36,7 @@ function Screens() {
           <Stack.Screen name="Stock" component={StockScreen} />
           <Stack.Screen name="Pick" component={PickScreen} />
           <Stack.Screen name="BomPick" component={BomPickScreen} />
+          <Stack.Screen name="BillScan" component={BillScanScreen} />
         </>
       ) : (
         <Stack.Screen name="SignIn" component={SignInScreen} />

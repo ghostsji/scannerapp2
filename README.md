@@ -16,6 +16,9 @@ The phone app for Tracklab IM. Sign in with your Tracklab email and password, th
   time; anything else must match what the BOM still needs. Lines go green on the phone and on the
   website as they're picked, and a scan can be undone. The website does the final check and books
   it out. This needs signal (the website watches it live), so it isn't queued offline.
+- **Scan a bill** (the **Bill** button): photograph each page of a supplier's invoice and send it.
+  It waits on the website under Purchases > Bills > From the scanner, already read (supplier, VAT
+  number, invoice number, dates, lines); a bill is only made when someone creates it there.
 - **Pick photo**: photograph picked stock against a sales order or delivery note number. It shows
   on the website under Sales > Scanner > Pick scans.
 
@@ -56,6 +59,7 @@ the home screen.
 | `App.js` | Sign-in gate and the screens |
 | `screens/StockScreen.js` | Book in / out, My scans (pages load as you scroll), the BOM banner |
 | `screens/BomPickScreen.js` | Scan BOM items |
+| `screens/BillScanScreen.js` | Scan a bill |
 | `screens/PickScreen.js` | Pick photos |
 | `screens/SignInScreen.js` | Sign in |
 | `components/CodeScanner.js` | Camera barcode scanner |

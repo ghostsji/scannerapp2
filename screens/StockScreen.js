@@ -252,6 +252,7 @@ export default function StockScreen({ navigation }) {
               <Text style={styles.small}>{user?.name}</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('BomPick')} style={styles.headBtn}><Text style={styles.headBtnText}>BOM</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('BillScan')} style={styles.headBtn}><Text style={styles.headBtnText}>Bill</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Pick')} style={styles.headBtn}><Text style={styles.headBtnText}>Pick photo</Text></TouchableOpacity>
             <TouchableOpacity onPress={askSignOut} style={styles.headBtn}><Text style={styles.headBtnText}>Sign out</Text></TouchableOpacity>
           </View>
